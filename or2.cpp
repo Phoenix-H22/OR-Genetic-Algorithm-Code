@@ -1,204 +1,272 @@
-// C++ implementation of the above approach
-#include <bits/stdc++.h>
-#include <limits.h>
-using namespace std;
- 
-// Number of cities in TSP
-#define V 4
- 
-// Names of the cities
-#define GENES ABCDE
- 
-// Starting Node Value
-#define START 0
- 
-// Initial population size for the algorithm
-#define POP_SIZE 10
- 
-// Structure of a GNOME
-// string defines the path traversed
-// by the salesman while the fitness value
-// of the path is stored in an integer
- 
-struct individual {
-    string gnome;
-    int fitness;
-};
- 
-// Function to return a random number
-// from start and end
-int rand_num(int start, int end)
-{
-    int r = end - start;
-    int rnum = start + rand() % r;
-    return rnum;
-}
- 
-// Function to check if the character
-// has already occurred in the string
-bool repeat(string s, char ch)
-{
-    for (int i = 0; i < s.size(); i++) {
-        if (s[i] == ch)
-            return true;
-    }
-    return false;
-}
- 
-// Function to return a mutated GNOME
-// Mutated GNOME is a string
-// with a random interchange
-// of two genes to create variation in species
-string mutatedGene(string gnome)
-{
-    while (true) {
-        int r = rand_num(1, V);
-        int r1 = rand_num(1, V);
-        if (r1 != r) {
-            char temp = gnome[r];
-            gnome[r] = gnome[r1];
-            gnome[r1] = temp;
-            break;
-        }
-    }
-    return gnome;
-}
- 
-// Function to return a valid GNOME string
-// required to create the population
-string create_gnome()
-{
-    string gnome = "0";
-    while (true) {
-        if (gnome.size() == V) {
-            gnome += gnome[0];
-            break;
-        }
-        int temp = rand_num(1, V);
-        if (!repeat(gnome, (char)(temp + 48)))
-            gnome += (char)(temp + 48);
-    }
-    return gnome;
-}
- 
-// Function to return the fitness value of a gnome.
-// The fitness value is the path length
-// of the path represented by the GNOME.
-int cal_fitness(string gnome,int map[V][V])
-{
-  
-    int f = 0;
-    for (int i = 0; i < gnome.size() - 1; i++) {
-        if (map[gnome[i] - 48][gnome[i + 1] - 48] == INT_MAX)
-            return INT_MAX;
-        f += map[gnome[i] - 48][gnome[i + 1] - 48];
-    }
-    return f;
-}
- 
-// Function to return the updated value
-// of the cooling element.
-int cooldown(int temp)
-{
-    return (90 * temp) / 100;
-}
- 
-// Comparator for GNOME struct.
-bool lessthan(struct individual t1,
-            struct individual t2)
-{
-    return t1.fitness < t2.fitness;
-}
- 
-// Utility function for TSP problem.
-void TSPUtil(int map[V][V])
-{
-    // Generation Number
-    int gen = 1;
-    // Number of Gene Iterations
-    int gen_thres = 5;
- 
-    vector<struct individual> population;
-    struct individual temp;
- 
-    // Populating the GNOME pool.
-    for (int i = 0; i < POP_SIZE; i++) {
-        temp.gnome = create_gnome();
-        temp.fitness = cal_fitness(temp.gnome,map);
-        population.push_back(temp);
-    }
- 
-    cout << "\nInitial population: " << endl
-        << "GNOME     FITNESS VALUE\n";
-    for (int i = 0; i < POP_SIZE; i++)
-        cout << population[i].gnome << " "
-            << population[i].fitness << endl;
-    cout << "\n";
- 
-    bool found = false;
-    int temperature = 10000;
- 
-    // Iteration to perform
-    // population crossing and gene mutation.
-    while (temperature > 1000 && gen <= gen_thres) {
-        sort(population.begin(), population.end(), lessthan);
-        cout << "\nCurrent temp: " << temperature << "\n";
-        vector<struct individual> new_population;
- 
-        for (int i = 0; i < POP_SIZE; i++) {
-            struct individual p1 = population[i];
- 
-            while (true) {
-                string new_g = mutatedGene(p1.gnome);
-                struct individual new_gnome;
-                new_gnome.gnome = new_g;
-                new_gnome.fitness = cal_fitness(new_gnome.gnome,map);
- 
-                if (new_gnome.fitness <= population[i].fitness) {
+// C++ code to implement the approach
 
-new_population.push_back(new_gnome);
-                    break;
-                }
-                else {
- 
-                    // Accepting the rejected children at
-                    // a possible probability above threshold.
-                    float prob = pow(2.7,
-                                    -1 * ((float)(new_gnome.fitness
-                                                - population[i].fitness)
-                                        / temperature));
-                    if (prob > 0.5) {
-                        new_population.push_back(new_gnome);
-                        break;
-                    }
-                }
-            }
-        }
- 
-        temperature = cooldown(temperature);
-        population = new_population;
-        cout << "Generation " << gen << " \n";
-        cout << "GNOME     FITNESS VALUE\n";
- 
-        for (int i = 0; i < POP_SIZE; i++)
-            cout << population[i].gnome << " "
-                << population[i].fitness << endl;
-        gen++;
-    }
+#include <bits/stdc++.h>
+using namespace std;
+
+// N is the number of cities/Node given
+#define N 4
+#define INF INT_MAX
+
+// Structure to store all the necessary information
+// to form state space tree
+struct Node {
+	
+	// Helps in tracing the path when the answer is found
+	// stores the edges of the path
+	// completed till current visited node
+	vector<pair<int, int> > path;
+
+	// Stores the reduced matrix
+	int reducedMatrix[N][N];
+
+	// Stores the lower bound
+	int cost;
+
+	// Stores the current city number
+	int vertex;
+	
+	// Stores the total number of cities visited
+	int level;
+};
+
+// Formation of edges and assigning
+// all the necessary information for new node
+Node* newNode(int parentMatrix[N][N],
+			vector<pair<int, int> > const& path,
+			int level, int i, int j)
+{
+	Node* node = new Node;
+	
+	// Stores parent edges of the state-space tree
+	node->path = path;
+
+	// Skip for the root node
+	if (level != 0) {
+		
+		// Add a current edge to the path
+		node->path.push_back(make_pair(i, j));
+	}
+
+	// Copy data from the parent node to the current node
+	memcpy(node->reducedMatrix, parentMatrix,
+		sizeof node->reducedMatrix);
+
+	// Change all entries of row i and column j to INF
+	// skip for the root node
+	for (int k = 0; level != 0 && k < N; k++) {
+		
+		// Set outgoing edges for the city i to INF
+		node->reducedMatrix[i][k] = INF;
+		
+		// Set incoming edges to city j to INF
+		node->reducedMatrix[k][j] = INF;
+	}
+
+	// Set (j, 0) to INF
+	// here start node is 0
+	node->reducedMatrix[j][0] = INF;
+
+	// Set number of cities visited so far
+	node->level = level;
+
+	// Assign current city number
+	node->vertex = j;
+
+	// Return node
+	return node;
 }
- 
+
+// Function to reduce each row so that
+// there must be at least one zero in each row
+int rowReduction(int reducedMatrix[N][N],
+				int row[N])
+{
+	// Initialize row array to INF
+	fill_n(row, N, INF);
+
+	// row[i] contains minimum in row i
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (reducedMatrix[i][j] < row[i]) {
+				row[i] = reducedMatrix[i][j];
+			}
+		}
+	}
+
+	// Reduce the minimum value from each element
+	// in each row
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (reducedMatrix[i][j] != INF
+				&& row[i] != INF) {
+				reducedMatrix[i][j] -= row[i];
+			}
+		}
+	}
+	return 0;
+}
+
+// Function to reduce each column so that
+// there must be at least one zero in each column
+int columnReduction(int reducedMatrix[N][N],
+					int col[N])
+{
+	// Initialize all elements of array col with INF
+	fill_n(col, N, INF);
+
+	// col[j] contains minimum in col j
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (reducedMatrix[i][j] < col[j]) {
+				col[j] = reducedMatrix[i][j];
+			}
+		}
+	}
+	// Reduce the minimum value from each element
+	// in each column
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (reducedMatrix[i][j] != INF
+				&& col[j] != INF) {
+				reducedMatrix[i][j] -= col[j];
+			}
+		}
+	}
+	return 0;
+}
+
+// Function to get the lower bound on the path
+// starting at the current minimum node
+int calculateCost(int reducedMatrix[N][N])
+{
+	// Initialize cost to 0
+	int cost = 0;
+
+	// Row Reduction
+	int row[N];
+	rowReduction(reducedMatrix, row);
+
+	// Column Reduction
+	int col[N];
+	columnReduction(reducedMatrix, col);
+
+	// The total expected cost is
+	// the sum of all reductions
+	for (int i = 0; i < N; i++) {
+		cost += (row[i] != INT_MAX) ? row[i] : 0,
+			cost += (col[i] != INT_MAX) ? col[i] : 0;
+	}
+	return cost;
+}
+
+// Function to print list of cities
+// visited following least cost
+void TSPPAthPrint(vector<pair<int, int> > const& list)
+{
+	for (int i = 0; i < list.size(); i++) {
+		cout << list[i].first + 1 << " -> "
+			<< list[i].second + 1 << "\n";
+	}
+}
+
+// Comparison object to be used to order the heap
+struct Min_Heap {
+	bool operator()(const Node* lhs, const Node* rhs) const
+	{
+		return lhs->cost > rhs->cost;
+	}
+};
+
+// Function to solve the traveling salesman problem
+// using Branch and Bound
+int solve(int CostGraphMatrix[N][N])
+{
+	// Create a priority queue to store live nodes
+	// of the search tree
+	priority_queue<Node*, vector<Node*>, Min_Heap> pq;
+	vector<pair<int, int> > v;
+
+	// Create a root node and calculate its cost.
+	// The TSP starts from the first city, i.e., node 0
+	Node* root = newNode(CostGraphMatrix, v, 0, -1, 0);
+
+	// Get the lower bound of the path
+	// starting at node 0
+	root->cost = calculateCost(root->reducedMatrix);
+
+	// Add root to the list of live nodes
+	pq.push(root);
+
+	// Finds a live node with the least cost,
+	// adds its children to the list of live nodes,
+	// and finally deletes it from the list
+	while (!pq.empty()) {
+		
+		// Find a live node with
+		// the least estimated cost
+		Node* min = pq.top();
+
+		// The found node is deleted from
+		// the list of live nodes
+		pq.pop();
+
+		// i stores the current city number
+		int i = min->vertex;
+		
+		// If all cities are visited
+		if (min->level == N - 1) {
+			
+			// Return to starting city
+			min->path.push_back(make_pair(i, 0));
+			
+			// Print list of cities visited
+			TSPPAthPrint(min->path);
+			
+			// Return optimal cost
+			return min->cost;
+		}
+
+		// Do for each child of min
+		// (i, j) forms an edge in a space tree
+		for (int j = 0; j < N; j++) {
+			if (min->reducedMatrix[i][j] != INF) {
+				
+				// Create a child node and
+				// calculate its cost
+				Node* child
+					= newNode(min->reducedMatrix, min->path,
+							min->level + 1, i, j);
+
+				child->cost
+					= min->cost + min->reducedMatrix[i][j]
+					+ calculateCost(child->reducedMatrix);
+				
+				// Add a child to the list of live nodes
+				pq.push(child);
+			}
+		}
+		
+		// Free node as we have already stored edges (i, j)
+		// in vector. So no need for a parent node while
+		// printing the solution.
+		delete min;
+	}
+	return 0;
+}
+// Driver code
 int main()
 {
- 
-    int map[V][V] ;
-    for (int i = 0; i < V; i++)
+    
+	int CostGraphMatrix[N][N];
+    for (int i = 0; i < N; i++)
     {
-        for (int l = 0; l < V; l++)
+        for (int j = 0; j < N; j++)
         {
-            cin>>map[i][l];
+            cin>>CostGraphMatrix[i][j];
         }
         
     }
-    
-    TSPUtil(map);
+	// Function call
+	cout << "Total cost is " << solve(CostGraphMatrix);
+	return 0;
 }
